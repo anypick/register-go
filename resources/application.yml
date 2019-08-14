@@ -1,0 +1,11 @@
+# 应用配置
+application:
+  server.port: 7080
+  name: register-go
+
+#  redis配置
+redis:
+  redisConfig:
+    - {addr: 192.168.56.131:6379}
+    - {addr: 192.168.56.132:6379, readOnly: true}
+    - {addr: 192.168.56.132:6380, readOnly: true}
