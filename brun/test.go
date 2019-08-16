@@ -3,11 +3,10 @@ package main
 import (
 	"fmt"
 	"reflect"
-	"time"
+	"strconv"
 )
 
 func main() {
-	var a interface{} = time.Now()
-	s := reflect.ValueOf(a).Type()
-	fmt.Println(s)
+	u := uint64(10001)
+	fmt.Println(strconv.FormatUint(reflect.ValueOf(u).Uint(), 10))
 }

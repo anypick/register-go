@@ -10,5 +10,5 @@ import (
 func init() {
 	infra.Register(&base.YamlStarter{})
 	infra.Register(&basegin.GinStarter{})
-	infra.Register(&basegin.WebStarter{})
+	infra.Register(&infra.BaseInitializerStarter{})
 }
