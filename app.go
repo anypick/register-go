@@ -1,14 +1,15 @@
 package register_go
 
 import (
-	_ "github.com/anypick/register-go/api/example"
-	"github.com/anypick/register-go/infra"
-	"github.com/anypick/register-go/infra/base"
-	"github.com/anypick/register-go/infra/base/gin"
+	"register-go/infra"
+	"register-go/infra/base"
+	"register-go/infra/base/gin"
+	"register-go/infra/base/redis"
 )
 
 func init() {
 	infra.Register(&base.YamlStarter{})
 	infra.Register(&basegin.GinStarter{})
+	infra.Register(&baseredis.RedisReplicationStarter{})
 	infra.Register(&infra.BaseInitializerStarter{})
 }

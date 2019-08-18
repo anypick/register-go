@@ -1,9 +1,9 @@
 package basegin
 
 import (
-	"github.com/anypick/register-go/infra"
 	"github.com/gin-gonic/gin"
 	"log"
+	"register-go/infra"
 )
 
 var ginEngine *gin.Engine
@@ -22,11 +22,11 @@ func (g *GinStarter) Init(ctx infra.StarterContext) {
 	ginEngine = initGinApp()
 }
 
-func  (g *GinStarter) Start(ctx infra.StarterContext) {
+func (g *GinStarter) Start(ctx infra.StarterContext) {
 	var (
 		engine *gin.Engine
-		port string
-		e error
+		port   string
+		e      error
 	)
 	engine = Gin()
 	if port, e = ctx.Yaml().Application.GetDefaultPort("8081"); e != nil {
@@ -47,10 +47,12 @@ func (g *GinStarter) StartBlocking() bool {
 }
 
 // 初始化gin
-func initGinApp() *gin.Engine  {
+func initGinApp() *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
 	app := gin.New()
 	// 可以处理程序panic，以及500错误
 	app.Use(gin.Recovery())
-	// 日志 TODO
+
+	// 日志
 	return app
 }

@@ -1,18 +1,18 @@
 package infra
 
 import (
-	"github.com/anypick/register-go/infra/utils/props"
 	"log"
 	"reflect"
+	"register-go/infra/utils/props"
 )
 
 // 负责Starter各个阶段方法的调用
 type BootApplication struct {
-	conf props.YamlSource
+	conf           props.YamlSource
 	starterContext StarterContext
 }
 
-func New(conf props.YamlSource) *BootApplication{
+func New(conf props.YamlSource) *BootApplication {
 	application := &BootApplication{conf, StarterContext{}}
 	application.starterContext[defaultProps] = conf
 	return application

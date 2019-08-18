@@ -3,10 +3,11 @@ package redisutil
 import (
 	"encoding/json"
 	"errors"
-	"github.com/anypick/register-go/infra/base/redis"
-	"github.com/anypick/register-go/infra/utils/common"
+	"fmt"
 	"github.com/go-redis/redis"
 	"log"
+	"register-go/infra/base/redis"
+	"register-go/infra/utils/common"
 	"strings"
 	"time"
 )
@@ -27,29 +28,29 @@ type IBaseDao interface {
 	// string类型数据插入
 	// @Param: data: 传入的数据，一定要有Id这个字段； expired: 过期时间，0表示永不过期； langCode: 多语言
 	// return: 是否成功
-	Add(data map[string]interface{}, expired time.Duration, langCode string) bool
+	Add(data map[string]interface{}, expired time.Duration, langCode string) (bool, error)
 
 	// 根据Id查询string类型数据，
 	// @Param: id: 数据Id, langCode: 多语言
 	// return: 返回数据
-	Get(id interface{}, langCode string) (data map[string]interface{})
+	Get(id interface{}, langCode string) (map[string]interface{}, error)
 
 	// 根据属性字段查询string类型数据
 	// @Param fieldName: 字段名， fieldValue：字段值， langCode：多语言
 	// return: 返回查询的数据
-	GetByField(fieldValue interface{}, fieldName string, langCode string) (data []map[string]interface{})
+	GetByField(fieldValue interface{}, fieldName string, langCode string) ([]map[string]interface{}, error)
 
 	// ======================Hash=======================
 
 	// hash类型数据插入
 	// @Param: data：传入数据，一定要有Id;expired:超时时间，0表示永不超时； langCode:多语言
 	// return: 是否成功
-	AddHash(data map[string]interface{}, expired time.Duration, langCode string) bool
+	AddHash(data map[string]interface{}, expired time.Duration, langCode string) (bool, error)
 
 	// hash数据类型获取
 	// @Param: id： 数据Id, fieldName：字段， langCode： 多语言支持
 	// return: 返回字段值，由用户转回成需要的数据类型（string->int, string->slice, string-> map ...）
-	GetHash(id interface{}, fieldName, langCode string) string
+	GetHash(id interface{}, fieldName, langCode string) (string, error)
 }
 
 // 定义一个redis的key,可能需要多个属性组成，在本代码中包含如下属性,组成格式：prefix:catalog:clazz:langCode:id, 或者：prefix:catalog:clazz:langCode:tmp:fieldName:fieldValue
@@ -71,159 +72,197 @@ type BaseDao struct {
 // =================================              string                ===============================================================
 // ==================================================================================================================================
 
-func (b *BaseDao) Add(data map[string]interface{}, expired time.Duration, langCode string) bool {
+func (b *BaseDao) Add(data map[string]interface{}, expired time.Duration, langCode string) (bool, error) {
 	var (
 		idKey       string
-		idValue     = data[b.IdName]
+		idValue     = data[b.IdDesc.FieldName]
 		marshalData []byte
-		fieldLen    = len(b.SelectFields)
-		operations  = make([]RedisOperation, fieldLen+1)
+		operations  = make([]RedisOperation, 0)
 		fieldOps    []RedisOperation
 		err         error
 	)
 	if idKey, err = b.createIdKey(idValue, langCode); err != nil {
 		log.Fatal(err.Error())
-		return false
+		return false, err
 	}
 	if marshalData, err = json.Marshal(data); err != nil {
 		log.Fatal(err)
-		return false
+		return false, err
 	}
-	idOperation := RedisOperation{Operation: Add, Type: Strings, Key: idKey, Value: string(marshalData)}
+	idOperation := RedisOperation{Operation: Add, DataType: Strings, Key: idKey, Value: string(marshalData)}
 	if fieldOps, err = b.creatSelectedField(idValue, data, Add, langCode); err != nil {
-		return false
+		return false, err
 	}
-	operations[0] = idOperation
+	operations = append(operations, idOperation)
 	operations = append(operations, fieldOps...)
-	return ExecutePipeline(operations, DefaultExpired)
+	return ExecutePipeline(operations, DefaultExpired), err
 }
 
-func (b *BaseDao) Get(id interface{}, langCode string) map[string]interface{} {
+func (b *BaseDao) Get(id interface{}, langCode string) (map[string]interface{}, error) {
 	var (
-		idKey string
-		err   error
+		idKey  string
+		result *redis.StringCmd
+		data   map[string]interface{}
+		err    error
 	)
 	if idKey, err = b.createIdKey(id, langCode); err != nil {
 		log.Fatal(err)
-		return nil
+		return nil, err
 	}
-	return b.getByKey(idKey)
+
+	client := baseredis.RedisClient(baseredis.SlaveNode)
+	if result = client.Get(idKey); result.Err() != nil {
+		log.Fatalln(result.Err())
+		return nil, err
+	}
+	if common.StrIsBlank(result.String()) {
+		log.Println("数据不存在")
+		return nil, nil
+	}
+	data = make(map[string]interface{})
+	if err := json.Unmarshal([]byte(result.Val()), &data); err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+	return data, err
 }
 
-func (b *BaseDao) GetByField(fieldValue interface{}, fieldName string, langCode string) (data []map[string]interface{}) {
-	if !containerField(fieldName, b.SelectFields) {
-		return nil
+func (b *BaseDao) GetByField(fieldValue interface{}, fieldName string, langCode string) ([]map[string]interface{}, error) {
+	if flag, _ := containerField(fieldName, b.SelectFields); !flag {
+		return nil, errors.New("field not exist")
 	}
 	var (
-		idKey    string
-		fieldKey string
-		cmders   []redis.Cmder
-		err      error
+		idKey  string
+		cmders []redis.Cmder
+		data   []map[string]interface{}
+		err    error
 	)
-	if fieldKey, err = b.createFieldKey(fieldValue, fieldName, langCode); err != nil {
-		log.Fatal(err)
-		return nil
-	}
 	pipeline := baseredis.RedisClient(baseredis.SlaveNode).Pipeline()
 
-	keys := b.getKeysByField(fieldKey)
+	keys := b.getKeysByField(fieldName, common.InterfaceToStr(fieldValue), langCode)
 	data = make([]map[string]interface{}, len(keys))
 	for _, key := range keys {
 		if idKey, err = b.createIdKey(key, langCode); err != nil {
 			log.Fatal(err)
-			return nil
+			return nil, err
 		}
 		pipeline.Get(idKey)
 	}
 	if cmders, err = pipeline.Exec(); err != nil {
 		log.Fatal(err)
-		return nil
+		return nil, err
 	}
 	for i, cmder := range cmders {
 		stringCmd := cmder.(*redis.StringCmd)
 		mapData := make(map[string]interface{})
 		if err = json.Unmarshal([]byte(stringCmd.Val()), mapData); err != nil {
 			log.Fatal(err)
-			return nil
+			return nil, err
 		}
 		data[i] = mapData
 	}
-	return data
+	return data, err
 }
 
 // string类型， 通过field获取id集合
-func (b *BaseDao) getKeysByField(fieldKey string) []string {
+func (b *BaseDao) getKeysByField(fieldName, fieldValue, langCode string) []string {
+	var (
+		isContainer     bool
+		fieldDescriptor FieldDescriptor
+		key             string
+	)
 	client := baseredis.RedisClient(baseredis.SlaveNode)
-	return client.SMembers(fieldKey).Val()
-}
-
-// string类型，通过key获取数据
-func (b *BaseDao) getByKey(key string) (data map[string]interface{}) {
-	client := baseredis.RedisClient(baseredis.SlaveNode)
-	result := client.Get(key)
-	data = make(map[string]interface{})
-	if err := json.Unmarshal([]byte(result.Val()), data); err != nil {
-		log.Fatal(err)
-		return nil
+	// 判断field类型
+	if isContainer, fieldDescriptor = containerField(fieldName, b.SelectFields); isContainer {
+		switch fieldDescriptor.FieldType {
+		case TypeEq:
+			key, _ = b.createFieldKey(fieldValue, fieldName, langCode)
+		case TypeMatch:
+			key, _ = b.createFieldKey(fieldValue, fieldName, langCode)
+		case TypeRange:
+			key, _ = b.createRangeKey(fieldName, langCode)
+		default:
+			return nil
+		}
+		return client.ZRange(key, 0, -1).Val()
 	}
-	return data
+	return nil
 }
 
 // ==================================================================================================================================
 // =================================              Hash                ===============================================================
 // ==================================================================================================================================
-func (b *BaseDao) AddHash(data map[string]interface{}, expired time.Duration, langCode string) bool {
+func (b *BaseDao) AddHash(data map[string]interface{}, expired time.Duration, langCode string) (bool, error) {
 	var (
-		idKey   string
-		cmders  []redis.Cmder
-		err     error
-		idValue = data[b.IdName]
+		idKey        string
+		redisOps     = make([]RedisOperation, 0)
+		fieldOps     []RedisOperation
+		marshalValue []byte
+		err          error
+		idValue      = data[b.IdDesc.FieldName]
 	)
-	pipeline := baseredis.RedisClient(baseredis.MasterNode).Pipeline()
 	if idKey, err = b.createHashKey(langCode); err != nil {
 		log.Fatalln(err)
-		return false
+		return false, err
 	}
+
 	for _, value := range data {
-		pipeline.HSet(idKey, common.InterfaceToStr(idValue), value)
+		if marshalValue, err = json.Marshal(value); err != nil {
+			log.Fatalln(err)
+			return false, err
+		}
+		idOps := RedisOperation{Operation: Add, DataType: Hashes, Key: idKey, RawKey: idKey, Value: string(marshalValue)}
+		redisOps = append(redisOps, idOps)
 	}
-	pipeline.Expire(idKey, expired)
 
-	if err = b.creatSelectedField(idValue, data, langCode); err != nil {
-		return false
-	}
-
-	if cmders, err = pipeline.Exec(); err != nil {
+	if fieldOps, err = b.creatSelectedField(idValue, data, Add, langCode); err != nil {
 		log.Fatalln(err)
-		return false
+		return false, err
 	}
-	log.Println(cmders)
-	return true
+	redisOps = append(redisOps, fieldOps...)
+	return ExecutePipeline(redisOps, expired), err
 }
 
-func (b *BaseDao) GetHash(id interface{}, fieldName, langCode string) string {
+func (b *BaseDao) GetHash(id interface{}, fieldName, langCode string) (string, error) {
 	var (
-		idKey string
-		err   error
+		hashKey string
+		err     error
 	)
 	client := baseredis.RedisClient(baseredis.SlaveNode)
-	if idKey, err = b.createIdKey(id, langCode); err != nil {
+	if hashKey, err = b.createHashKey(langCode); err != nil {
 		log.Fatalln(err)
-		return common.NilString
+		return common.NilString, err
 	}
-	return client.HGet(idKey, fieldName).Val()
+	return client.HGet(hashKey, common.InterfaceToStr(id)).Val(), err
 }
 
-func (b *BaseDao) GetAllHash(id interface{}, langCode string) {
+func (b *BaseDao) GetAllHash(id interface{}, page, pageSize int, langCode string) (pageInfo PageInfo, err error) {
 	var (
-		idKey string
-		err   error
+		hashKey  string
+		client   = baseredis.RedisClient(baseredis.SlaveNode)
+		pipeline = client.Pipeline()
+		//value = make(map[string]interface{})
+		//values = make([]map[string]interface{}, pageSize)
+		cmders []redis.Cmder
 	)
-	client := baseredis.RedisClient(baseredis.SlaveNode)
-	if idKey, err = b.createIdKey(id, langCode); err != nil {
-		log.Fatalln(err)
+	if hashKey, err = b.createHashKey(langCode); err != nil {
 		return
 	}
+	keys := client.HKeys(hashKey).Val()
+	if keys == nil || len(keys) == 0 {
+		err = errors.New("hash table is nil")
+		return
+	}
+
+	curPageKeys := keys[(page-1)*pageSize : page*pageSize]
+	for _, idKey := range curPageKeys {
+		pipeline.HGet(hashKey, idKey)
+	}
+	if cmders, err = pipeline.Exec(); err != nil {
+		return
+	}
+	fmt.Println(cmders)
+	return
 }
 
 func (b *BaseDao) GetHashByField() {
@@ -245,9 +284,9 @@ func (b *BaseDao) createIdKey(id interface{}, langCode string) (string, error) {
 	builder.WriteString(Prefix)
 	builder.WriteString(b.Catalog)
 	builder.WriteString(":")
-	builder.WriteString(b.Clazz)
-	builder.WriteString(":")
 	builder.WriteString(langCode)
+	builder.WriteString(":")
+	builder.WriteString(b.Clazz)
 	builder.WriteString(":")
 
 	builder.WriteString(idKey)
@@ -255,11 +294,11 @@ func (b *BaseDao) createIdKey(id interface{}, langCode string) (string, error) {
 }
 
 // 创建FieldKey
-func (b *BaseDao) createFieldKey(field interface{}, fieldName, langCode string) (string, error) {
+func (b *BaseDao) createFieldKey(fieldValue interface{}, fieldName, langCode string) (string, error) {
 	if common.StrIsBlank(langCode) {
 		langCode = DefaultLangCode
 	}
-	fieldKey := common.InterfaceToStr(field)
+	fieldKey := common.InterfaceToStr(fieldValue)
 	if common.StrIsBlank(fieldKey) {
 		return common.NilString, errors.New("field value error")
 	}
@@ -268,9 +307,10 @@ func (b *BaseDao) createFieldKey(field interface{}, fieldName, langCode string) 
 	builder.WriteString(Prefix)
 	builder.WriteString(b.Catalog)
 	builder.WriteString(":")
-	builder.WriteString(b.Clazz)
-	builder.WriteString(":")
 	builder.WriteString(langCode)
+	builder.WriteString(":")
+	builder.WriteString(b.Clazz)
+
 	builder.WriteString(":tmp:")
 	builder.WriteString(fieldName)
 	builder.WriteString(":")
@@ -288,10 +328,29 @@ func (b *BaseDao) createHashKey(langCode string) (string, error) {
 	builder.WriteString(Prefix)
 	builder.WriteString(b.Catalog)
 	builder.WriteString(":")
+	builder.WriteString(langCode)
+	builder.WriteString(":")
 	builder.WriteString(b.Clazz)
+
+	return builder.String(), nil
+}
+
+// 创建排序字段的key
+func (b *BaseDao) createRangeKey(fieldName, langCode string) (string, error) {
+	if common.StrIsBlank(langCode) {
+		langCode = DefaultLangCode
+	}
+	builder := strings.Builder{}
+	// TODO 使用子类去实现
+	builder.WriteString(Prefix)
+	builder.WriteString(b.Catalog)
 	builder.WriteString(":")
 	builder.WriteString(langCode)
+	builder.WriteString(":")
+	builder.WriteString(b.Clazz)
+	builder.WriteString(":")
 
+	builder.WriteString(fieldName)
 	return builder.String(), nil
 }
 
@@ -299,21 +358,36 @@ func (b *BaseDao) createHashKey(langCode string) (string, error) {
 func (b *BaseDao) creatSelectedField(idValue interface{}, data map[string]interface{}, operation OperationType, langCode string) ([]RedisOperation, error) {
 	var (
 		fieldKey string
+		dataType = ZSets
+		score    = Zero
 		err      error
 	)
 	operations := make([]RedisOperation, len(b.SelectFields))
 	if len(b.SelectFields) > 0 {
 		for i, value := range b.SelectFields {
-			if fieldKey, err = b.createFieldKey(data[value], value, langCode); err != nil {
+			fieldValue := data[value.FieldName]
+			if fieldKey, err = b.createFieldKey(fieldValue, value.FieldName, langCode); err != nil {
 				log.Fatalln(err)
 				return nil, err
 			}
+			switch value.FieldType {
+			case TypeRange:
+				if fieldKey, err = b.createRangeKey(value.FieldName, langCode); err != nil {
+					log.Fatalln(err)
+					return nil, err
+				}
+				dataType = ZSets
+				score = countScore(fieldValue)
+				break
+			default:
+				break
+			}
 			op := RedisOperation{
 				Operation: operation,
-				Type:      Lists,
+				DataType:  dataType,
 				Key:       fieldKey,
 				RawKey:    common.InterfaceToStr(idValue),
-				Score:     Zero,
+				Score:     score,
 			}
 			operations[i] = op
 		}
@@ -321,12 +395,34 @@ func (b *BaseDao) creatSelectedField(idValue interface{}, data map[string]interf
 	return operations, nil
 }
 
+// 创建字段描述
+func (b *BaseDao) CreateFieldDescriptor(fieldName string, fieldType FieldType) {
+	if b.SelectFields == nil {
+		b.SelectFields = make([]FieldDescriptor, 0)
+	}
+	b.SelectFields = append(b.SelectFields, FieldDescriptor{FieldName: fieldName, FieldType: fieldType})
+}
+
 // 查询是否包含fieldName
-func containerField(fieldName string, selectFields []FieldDescriptor) bool {
+func containerField(fieldName string, selectFields []FieldDescriptor) (bool, FieldDescriptor) {
+	if selectFields == nil || len(selectFields) == 0 {
+		return false, FieldDescriptor{}
+	}
 	for i := 0; i < len(selectFields); i++ {
 		if selectFields[i].FieldName == fieldName {
-			return true
+			return true, selectFields[i]
 		}
 	}
-	return false
+	return false, FieldDescriptor{}
+}
+
+// 根据传入字段进行计算分数
+func countScore(v interface{}) float64 {
+	switch v.(type) {
+	case time.Time:
+		return float64(v.(time.Time).Unix())
+	default:
+		break
+	}
+	return 0
 }

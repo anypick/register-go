@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	_ "github.com/anypick/register-go"
-	"github.com/anypick/register-go/infra"
-	"github.com/anypick/register-go/infra/utils/props"
+	_ "register-go"
+	"register-go/infra"
+	"register-go/infra/utils/props"
+	_ "register-go/src/site/controller"
 )
-
 
 func main() {
 	banner := `
@@ -22,5 +22,3 @@ _______  ____   ____ |__| ______/  |_  ___________            ____   ____
 	application := infra.New(*yamlConf)
 	application.Start()
 }
-
-

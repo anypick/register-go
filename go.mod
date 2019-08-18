@@ -1,4 +1,4 @@
-module github.com/anypick/register-go
+module register-go
 
 go 1.12
 

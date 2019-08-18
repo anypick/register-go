@@ -2,24 +2,24 @@ package props
 
 import (
 	"errors"
-	"github.com/anypick/register-go/infra/base/redis/config"
-	"github.com/anypick/register-go/infra/utils/common"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
+	"register-go/infra/base/redis/config"
+	"register-go/infra/utils/common"
 )
 
 // 将yaml文件映射成结构体
 type YamlSource struct {
-	Application `yaml:"application"`
+	Application  `yaml:"application"`
 	config.Redis `yaml:"redis"`
 }
 
 func NewYamlSource(filePathName string) *YamlSource {
 	var (
 		yamlSource = new(YamlSource)
-		data []byte
-		e error
+		data       []byte
+		e          error
 	)
 	if data, e = ioutil.ReadFile(filePathName); e != nil {
 		log.Fatal(e)
@@ -47,5 +47,3 @@ func (a Application) GetDefaultPort(defaultPort string) (string, error) {
 		return a.Port, nil
 	}
 }
-
-

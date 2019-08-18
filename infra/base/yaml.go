@@ -1,8 +1,8 @@
 package base
 
 import (
-	"github.com/anypick/register-go/infra"
-	"github.com/anypick/register-go/infra/utils/props"
+	"register-go/infra"
+	"register-go/infra/utils/props"
 )
 
 var (
@@ -20,5 +20,3 @@ type YamlStarter struct {
 func (p *YamlStarter) Init(ctx infra.StarterContext) {
 	yamlProps = ctx.Yaml()
 }
-
-

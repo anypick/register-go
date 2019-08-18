@@ -2,12 +2,12 @@ package config
 
 /**
 定义Redis的配置信息，映射yaml文件中的配置
- */
+*/
 
 import (
 	"errors"
-	"github.com/anypick/register-go/infra/utils/common"
 	"reflect"
+	"register-go/infra/utils/common"
 	"time"
 )
 

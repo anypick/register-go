@@ -1,5 +1,7 @@
 package redisutil
 
+import "errors"
+
 type DataStructure uint
 
 const (
@@ -14,6 +16,7 @@ const (
 )
 
 type OperationType uint
+
 const (
 	// 更新数据
 	Add OperationType = iota
@@ -29,12 +32,12 @@ const (
 
 /**
 定义Redis操作属性
- */
+*/
 type RedisOperation struct {
 	// 操作类型：ref, add, del
 	Operation OperationType
 	// 操作的数据类型
-	Type DataStructure
+	DataType DataStructure
 	// key字段
 	Key string
 	// Hashes 类型的field
@@ -50,11 +53,14 @@ const (
 )
 
 type FieldType uint
+
 const (
+	// 该字段和id 一一对应, redis中strings类型
 	TypeEq FieldType = iota
+	// 该字段和id是多对一关系
 	TypeMatch
+	// 需要排序
 	TypeRange
-	TypePage
 )
 
 // 字段描述，定义查询的字段
@@ -65,3 +71,33 @@ type FieldDescriptor struct {
 	FieldType FieldType
 }
 
+const (
+	DefaultPage     = 1
+	DefaultPageSize = 16
+)
+
+// 分页信息
+type PageInfo struct {
+	Page      int
+	PageSize  int
+	TotalPage int
+	Total     int
+	Value     []map[string]interface{}
+}
+
+func NewPageInfo(page, pageSize, total int, value []map[string]interface{}) (pageInfo PageInfo, err error) {
+	if total == 0 {
+		err = errors.New("total cannot is 0")
+		return
+	}
+	if page == 0 {
+		page = DefaultPage
+	}
+
+	if pageSize == 0 {
+		pageSize = DefaultPageSize
+	}
+	totalPage := total/pageSize + 1
+	pageInfo = PageInfo{Page: page, PageSize: pageSize, TotalPage: totalPage, Total: totalPage, Value: value}
+	return
+}

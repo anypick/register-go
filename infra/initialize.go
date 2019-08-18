@@ -9,15 +9,11 @@ type InitializerRegister struct {
 	Initializers []Initializer
 }
 
-
 func (i *InitializerRegister) Register(ai Initializer) {
 	i.Initializers = append(i.Initializers, ai)
 }
 
-
-
 var apiRegister *InitializerRegister = new(InitializerRegister)
-
 
 func RegisterApi(ai Initializer) {
 	apiRegister.Register(ai)
@@ -26,7 +22,6 @@ func RegisterApi(ai Initializer) {
 func GetApiRegister() []Initializer {
 	return apiRegister.Initializers
 }
-
 
 // 用于注册业务结构体
 type BaseInitializerStarter struct {

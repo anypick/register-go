@@ -1,10 +1,10 @@
 package baseredis
 
 import (
-	"github.com/anypick/register-go/infra"
-	"github.com/anypick/register-go/infra/utils/balance"
-	"github.com/anypick/register-go/infra/utils/common"
 	"github.com/go-redis/redis"
+	"register-go/infra"
+	"register-go/infra/utils/balance"
+	"register-go/infra/utils/common"
 )
 
 // 定义节点角色，主节点（只写）/从节点（只读）

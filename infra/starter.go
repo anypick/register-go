@@ -1,7 +1,7 @@
 package infra
 
 import (
-	"github.com/anypick/register-go/infra/utils/props"
+	"register-go/infra/utils/props"
 	"sort"
 )
 
@@ -12,7 +12,7 @@ const (
 	// 配置文件名称, TODO 支持环境隔离
 	configFilepathName = "resources/application.yml"
 	// 配置文件key，通过这key，可以获取配置文件对象
-	defaultProps                             = "props"
+	defaultProps                      = "props"
 	BasicResourcesGroup PriorityGroup = 20
 	INT_MAX                           = int(^uint(0) >> 1)
 	DEFAULT_PRIORITY                  = 0
@@ -63,7 +63,7 @@ func (b *BaseStarter) Priority() int                { return DEFAULT_PRIORITY }
 
 // 集中管理Starter
 type starterRegister struct {
-	blockStarter   []Starter
+	blockStarter     []Starter
 	noneBlockStarter []Starter
 }
 
