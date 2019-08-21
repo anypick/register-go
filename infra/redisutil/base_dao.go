@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-redis/redis"
+	"github.com/sirupsen/logrus"
 	"log"
 	"register-go/infra/base/redis"
 	"register-go/infra/utils/common"
@@ -38,7 +39,7 @@ type IBaseDao interface {
 	// 根据属性字段查询string类型数据
 	// @Param fieldName: 字段名， fieldValue：字段值， langCode：多语言
 	// return: 返回查询的数据
-	GetByField(fieldValue interface{}, fieldName string, langCode string) ([]map[string]interface{}, error)
+	GetByField(fieldValue interface{}, fieldName string, langCode string, page, pageSize int) ([]map[string]interface{}, error)
 
 	// ======================Hash=======================
 
@@ -82,11 +83,11 @@ func (b *BaseDao) Add(data map[string]interface{}, expired time.Duration, langCo
 		err         error
 	)
 	if idKey, err = b.createIdKey(idValue, langCode); err != nil {
-		log.Fatal(err.Error())
+		logrus.Error(err.Error())
 		return false, err
 	}
 	if marshalData, err = json.Marshal(data); err != nil {
-		log.Fatal(err)
+		logrus.Error(err)
 		return false, err
 	}
 	idOperation := RedisOperation{Operation: Add, DataType: Strings, Key: idKey, Value: string(marshalData)}
@@ -112,25 +113,22 @@ func (b *BaseDao) Get(id interface{}, langCode string) (map[string]interface{}, 
 
 	client := baseredis.RedisClient(baseredis.SlaveNode)
 	if result = client.Get(idKey); result.Err() != nil {
-		log.Fatalln(result.Err())
-		return nil, err
+		logrus.Error(result.Err())
+		return nil, result.Err()
 	}
 	if common.StrIsBlank(result.String()) {
-		log.Println("数据不存在")
+		logrus.Info("数据不存在")
 		return nil, nil
 	}
 	data = make(map[string]interface{})
 	if err := json.Unmarshal([]byte(result.Val()), &data); err != nil {
-		log.Fatal(err)
+		logrus.Error(err)
 		return nil, err
 	}
 	return data, err
 }
 
-func (b *BaseDao) GetByField(fieldValue interface{}, fieldName string, langCode string) ([]map[string]interface{}, error) {
-	if flag, _ := containerField(fieldName, b.SelectFields); !flag {
-		return nil, errors.New("field not exist")
-	}
+func (b *BaseDao) GetByField(fieldValue interface{}, fieldName string, langCode string, page, pageSize int) ([]map[string]interface{}, error) {
 	var (
 		idKey  string
 		cmders []redis.Cmder
@@ -138,25 +136,28 @@ func (b *BaseDao) GetByField(fieldValue interface{}, fieldName string, langCode 
 		err    error
 	)
 	pipeline := baseredis.RedisClient(baseredis.SlaveNode).Pipeline()
-
-	keys := b.getKeysByField(fieldName, common.InterfaceToStr(fieldValue), langCode)
+	keys := b.getKeysByField(fieldName, common.InterfaceToStr(fieldValue), langCode, page, pageSize)
+	if len(keys) == 0 {
+		logrus.Warn("查询的数据不存在")
+		return nil, nil
+	}
 	data = make([]map[string]interface{}, len(keys))
 	for _, key := range keys {
 		if idKey, err = b.createIdKey(key, langCode); err != nil {
-			log.Fatal(err)
+			logrus.Error(err)
 			return nil, err
 		}
 		pipeline.Get(idKey)
 	}
 	if cmders, err = pipeline.Exec(); err != nil {
-		log.Fatal(err)
+		logrus.Error(err)
 		return nil, err
 	}
 	for i, cmder := range cmders {
 		stringCmd := cmder.(*redis.StringCmd)
 		mapData := make(map[string]interface{})
-		if err = json.Unmarshal([]byte(stringCmd.Val()), mapData); err != nil {
-			log.Fatal(err)
+		if err = json.Unmarshal([]byte(stringCmd.Val()), &mapData); err != nil {
+			logrus.Error(err)
 			return nil, err
 		}
 		data[i] = mapData
@@ -164,29 +165,55 @@ func (b *BaseDao) GetByField(fieldValue interface{}, fieldName string, langCode 
 	return data, err
 }
 
-// string类型， 通过field获取id集合
-func (b *BaseDao) getKeysByField(fieldName, fieldValue, langCode string) []string {
+// 通过field获取key
+func (b *BaseDao) getKeysByField(fieldName, fieldValue, langCode string, page, pageSize int) []string {
 	var (
 		isContainer     bool
 		fieldDescriptor FieldDescriptor
 		key             string
+		client          = baseredis.RedisClient(baseredis.SlaveNode)
+		keys            = make([]string, 0)
 	)
-	client := baseredis.RedisClient(baseredis.SlaveNode)
 	// 判断field类型
 	if isContainer, fieldDescriptor = containerField(fieldName, b.SelectFields); isContainer {
 		switch fieldDescriptor.FieldType {
 		case TypeEq:
-			key, _ = b.createFieldKey(fieldValue, fieldName, langCode)
+			key, _ = b.createHashFieldKey(fieldName, langCode)
+			stringCmd := client.HGet(key, fieldValue)
+			if stringCmd.Err() != nil {
+				logrus.Warn(stringCmd.Err())
+			} else {
+				keys = append(keys, stringCmd.Val())
+			}
+			break
 		case TypeMatch:
 			key, _ = b.createFieldKey(fieldValue, fieldName, langCode)
+			start, stop := countPage(page, pageSize)
+			stringSliceCmd := client.ZRange(key, start, stop)
+			if stringSliceCmd.Err() != nil {
+				logrus.Warn(stringSliceCmd.Err())
+			} else {
+				keys = append(keys, stringSliceCmd.Val()...)
+			}
+			break
 		case TypeRange:
 			key, _ = b.createRangeKey(fieldName, langCode)
+			start, stop := countPage(page, pageSize)
+			stringSliceCmd := client.ZRange(key, start, stop)
+			if stringSliceCmd.Err() != nil {
+				logrus.Warn(stringSliceCmd.Err())
+			} else {
+				keys = append(keys, stringSliceCmd.Val()...)
+			}
+			break
 		default:
-			return nil
+			logrus.Warn("查询field type不存在")
+			return keys
 		}
-		return client.ZRange(key, 0, -1).Val()
+		return keys
 	}
-	return nil
+	logrus.Warn("查询field不存在")
+	return keys
 }
 
 // ==================================================================================================================================
@@ -269,6 +296,10 @@ func (b *BaseDao) GetHashByField() {
 
 }
 
+// =========================================================================================
+// ======================   创建各种数据类型的Key   ===========================================
+//===========================================================================================
+
 // 创建key
 // id 可以是string, 也有可能是uint64,基本不会出现第三种情况
 func (b *BaseDao) createIdKey(id interface{}, langCode string) (string, error) {
@@ -279,18 +310,8 @@ func (b *BaseDao) createIdKey(id interface{}, langCode string) (string, error) {
 	if common.StrIsBlank(idKey) {
 		return common.NilString, errors.New("id value error")
 	}
-	builder := strings.Builder{}
-	// TODO 使用子类去实现
-	builder.WriteString(Prefix)
-	builder.WriteString(b.Catalog)
-	builder.WriteString(":")
-	builder.WriteString(langCode)
-	builder.WriteString(":")
-	builder.WriteString(b.Clazz)
-	builder.WriteString(":")
-
-	builder.WriteString(idKey)
-	return builder.String(), nil
+	prefix := b.createKey(langCode)
+	return prefix + ":" + idKey, nil
 }
 
 // 创建FieldKey
@@ -298,41 +319,30 @@ func (b *BaseDao) createFieldKey(fieldValue interface{}, fieldName, langCode str
 	if common.StrIsBlank(langCode) {
 		langCode = DefaultLangCode
 	}
-	fieldKey := common.InterfaceToStr(fieldValue)
-	if common.StrIsBlank(fieldKey) {
+	fieldValueKey := common.InterfaceToStr(fieldValue)
+	if common.StrIsBlank(fieldValueKey) {
 		return common.NilString, errors.New("field value error")
 	}
-	builder := strings.Builder{}
-	// TODO 使用子类去实现
-	builder.WriteString(Prefix)
-	builder.WriteString(b.Catalog)
-	builder.WriteString(":")
-	builder.WriteString(langCode)
-	builder.WriteString(":")
-	builder.WriteString(b.Clazz)
-
-	builder.WriteString(":tmp:")
-	builder.WriteString(fieldName)
-	builder.WriteString(":")
-	builder.WriteString(fieldKey)
-	return builder.String(), nil
+	prefix := b.createKey(langCode)
+	return prefix + ":" + fieldName + ":" + fieldValueKey, nil
 }
 
-// 创建HashKey： key(prefix:catalog:clazz:lanCode) field(id) value
+// feild存储类型为hash，创建hashFieldkey
+func (b *BaseDao) createHashFieldKey(fieldName, langCode string) (string, error) {
+	if common.StrIsBlank(langCode) {
+		langCode = DefaultLangCode
+	}
+	prefix := b.createKey(langCode)
+		return prefix + ":" + fieldName, nil
+}
+
+// 创建HashKey：
 func (b *BaseDao) createHashKey(langCode string) (string, error) {
 	if common.StrIsBlank(langCode) {
 		langCode = DefaultLangCode
 	}
-	builder := strings.Builder{}
-	// TODO 使用子类去实现
-	builder.WriteString(Prefix)
-	builder.WriteString(b.Catalog)
-	builder.WriteString(":")
-	builder.WriteString(langCode)
-	builder.WriteString(":")
-	builder.WriteString(b.Clazz)
-
-	return builder.String(), nil
+	prefix := b.createKey(langCode)
+	return prefix, nil
 }
 
 // 创建排序字段的key
@@ -340,18 +350,24 @@ func (b *BaseDao) createRangeKey(fieldName, langCode string) (string, error) {
 	if common.StrIsBlank(langCode) {
 		langCode = DefaultLangCode
 	}
+	prefix := b.createKey(langCode)
+	return prefix + ":" + fieldName, nil
+}
+
+// 创建Key的前缀
+func (b *BaseDao) createKey(langCode string) string {
+	if common.StrIsBlank(langCode) {
+		langCode = DefaultLangCode
+	}
 	builder := strings.Builder{}
-	// TODO 使用子类去实现
 	builder.WriteString(Prefix)
 	builder.WriteString(b.Catalog)
 	builder.WriteString(":")
 	builder.WriteString(langCode)
 	builder.WriteString(":")
 	builder.WriteString(b.Clazz)
-	builder.WriteString(":")
+	return builder.String()
 
-	builder.WriteString(fieldName)
-	return builder.String(), nil
 }
 
 // 任何数据类型，添加要查询的field到redis
@@ -360,34 +376,50 @@ func (b *BaseDao) creatSelectedField(idValue interface{}, data map[string]interf
 		fieldKey string
 		dataType = ZSets
 		score    = Zero
+		rawKey   = common.InterfaceToStr(idValue)
 		err      error
 	)
 	operations := make([]RedisOperation, len(b.SelectFields))
 	if len(b.SelectFields) > 0 {
 		for i, value := range b.SelectFields {
 			fieldValue := data[value.FieldName]
-			if fieldKey, err = b.createFieldKey(fieldValue, value.FieldName, langCode); err != nil {
-				log.Fatalln(err)
-				return nil, err
-			}
 			switch value.FieldType {
+			// feild和Id一一对应
+			case TypeEq:
+				// 使用hash数据类型
+				dataType = Hashes
+				if fieldKey, err = b.createHashFieldKey(value.FieldName, langCode); err != nil {
+					logrus.Error(err)
+					return nil, err
+				}
+				rawKey = common.InterfaceToStr(fieldValue)
+				break
+			// 需要针对Field进行排序，排序规则根据Score
 			case TypeRange:
 				if fieldKey, err = b.createRangeKey(value.FieldName, langCode); err != nil {
 					log.Fatalln(err)
 					return nil, err
 				}
 				dataType = ZSets
+				rawKey = common.InterfaceToStr(idValue)
 				score = countScore(fieldValue)
 				break
 			default:
+				if fieldKey, err = b.createFieldKey(fieldValue, value.FieldName, langCode); err != nil {
+					log.Fatalln(err)
+					return nil, err
+				}
+				dataType = ZSets
+				rawKey = common.InterfaceToStr(idValue)
 				break
 			}
 			op := RedisOperation{
 				Operation: operation,
 				DataType:  dataType,
 				Key:       fieldKey,
-				RawKey:    common.InterfaceToStr(idValue),
+				RawKey:    rawKey,
 				Score:     score,
+				Value:     common.InterfaceToStr(idValue),
 			}
 			operations[i] = op
 		}
@@ -425,4 +457,8 @@ func countScore(v interface{}) float64 {
 		break
 	}
 	return 0
+}
+
+func countPage(page, pageSize int) (int64, int64) {
+	return int64((page - 1) * pageSize), int64(page * pageSize - 1)
 }

@@ -5,14 +5,16 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
+	logrus "register-go/infra/base/log/config"
 	"register-go/infra/base/redis/config"
 	"register-go/infra/utils/common"
 )
 
 // 将yaml文件映射成结构体
 type YamlSource struct {
-	Application  `yaml:"application"`
-	config.Redis `yaml:"redis"`
+	Application      `yaml:"application"`
+	config.Redis     `yaml:"redis"`
+	logrus.LogConfig `yaml:"logrus"`
 }
 
 func NewYamlSource(filePathName string) *YamlSource {

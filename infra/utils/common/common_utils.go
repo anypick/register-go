@@ -22,7 +22,6 @@ func StrIsBlank(str string) bool {
 	return false
 }
 
-
 func InterfaceToStr(source interface{}) string {
 	switch source.(type) {
 	case string:
@@ -40,4 +39,15 @@ func InterfaceToStr(source interface{}) string {
 	default:
 		panic(errors.New("interface type cannot transform string" + reflect.ValueOf(source).Type().String()))
 	}
+}
+
+func StructToMap(source interface{}) map[string]interface{} {
+	typeOf := reflect.TypeOf(source)
+	valueOf := reflect.ValueOf(source)
+	count := valueOf.NumField()
+	data := make(map[string]interface{}, count)
+	for i := 0; i < count; i ++ {
+		data[typeOf.Field(i).Name] = valueOf.Field(i).Interface()
+	}
+	return data
 }

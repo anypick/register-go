@@ -9,9 +9,12 @@ require (
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/json-iterator/go v1.1.7 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
+	github.com/lestrrat-go/file-rotatelogs v2.2.0+incompatible
+	github.com/lestrrat-go/strftime v0.0.0-20190725011945-5c849dd2c51d // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
+	github.com/sirupsen/logrus v1.4.2
 	github.com/ugorji/go v1.1.7 // indirect
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7 // indirect
 	golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // indirect

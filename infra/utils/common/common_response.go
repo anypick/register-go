@@ -10,15 +10,19 @@ type ResponseData struct {
 	Msg     string `json:",omitempty"`
 	Success bool
 	Total   int
-	Rows    []interface{}
+	Rows    interface{}
 }
 
 func NewRespSucc() ResponseData {
 	return ResponseData{Code: SuccessCode, Success: true}
 }
 
-func NewRespSuccWithData(rows []interface{}) ResponseData {
-	return ResponseData{Code: SuccessCode, Success: true, Total: len(rows), Rows: rows}
+func NewRespSuccWithData(rows interface{},  total int) ResponseData {
+	return ResponseData{Code: SuccessCode, Success: true, Total: total, Rows: rows}
+}
+
+func NewRespSuccWithMsg(msg string) ResponseData {
+	return ResponseData{Code: SuccessCode, Msg: msg, Success: true, Total: 0}
 }
 
 func NewRespFail() ResponseData {

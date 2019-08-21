@@ -88,7 +88,7 @@ func (s *starterRegister) AllStarters() []Starter {
 
 var StarterRegister = new(starterRegister)
 
-// 由外部调用，将starter注册到starterRegister中，由容器统一管理，starter的实例
+// 将starter注册到starterRegister中，由容器统一管理，starter的实例
 func Register(s Starter) {
 	StarterRegister.Register(s)
 }

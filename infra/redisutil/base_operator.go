@@ -3,6 +3,7 @@ package redisutil
 import (
 	"errors"
 	"github.com/go-redis/redis"
+	"github.com/sirupsen/logrus"
 	"log"
 	"register-go/infra/base/redis"
 	"time"
@@ -24,8 +25,9 @@ func ExecutePipeline(redisOps []RedisOperation, expired time.Duration) bool {
 		}
 	}
 	cmders, e := pipeline.Exec()
-	log.Println(cmders)
+	logrus.Info(cmders)
 	if e != nil {
+		logrus.Error(e)
 		return false
 	}
 	return true
@@ -60,7 +62,7 @@ func addPipeline(pipeline redis.Pipeliner, redisOperation RedisOperation, expire
 		pipeline.Expire(key, expired)
 	}
 	if err != nil {
-		log.Fatalln(err, key, raw)
+		logrus.Error(err, key, raw)
 	}
 }
 

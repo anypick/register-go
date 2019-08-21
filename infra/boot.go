@@ -1,7 +1,7 @@
 package infra
 
 import (
-	"log"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"register-go/infra/utils/props"
 )
@@ -28,7 +28,7 @@ func (b *BootApplication) Start() {
 }
 
 func (b *BootApplication) init() {
-	log.Println("Application init...")
+	logrus.Info("Application init...")
 	starters := StarterRegister.AllStarters()
 	for _, starter := range starters {
 		starter.Init(b.starterContext)
@@ -36,7 +36,7 @@ func (b *BootApplication) init() {
 }
 
 func (b *BootApplication) setup() {
-	log.Println("Application setup...")
+	logrus.Info("Application setup...")
 	starters := StarterRegister.AllStarters()
 	for _, starter := range starters {
 		starter.Setup(b.starterContext)
@@ -44,11 +44,11 @@ func (b *BootApplication) setup() {
 }
 
 func (b *BootApplication) start() {
-	log.Println("Application starter...")
+	logrus.Info("Application start")
 	starters := StarterRegister.AllStarters()
 	for index, starter := range starters {
 		typ := reflect.TypeOf(starter)
-		log.Println("Starting: ", typ.String())
+		logrus.Info("Starting: ", typ.String())
 		if starter.StartBlocking() {
 			if index+1 == len(StarterRegister.AllStarters()) {
 				starter.Start(b.starterContext)

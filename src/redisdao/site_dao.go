@@ -1,7 +1,6 @@
 package redisdao
 
 import (
-	"fmt"
 	"register-go/infra"
 	"register-go/infra/redisutil"
 )
@@ -21,7 +20,7 @@ type SiteDao struct {
 }
 
 func (s *SiteDao) Init() {
-	siteDao = &SiteDao{}
+	siteDao = s
 	siteDao.Catalog = "Site"
 	siteDao.Clazz = "site"
 	siteDao.IdDesc = redisutil.FieldDescriptor{FieldName: "SiteId", FieldType: redisutil.TypeEq}
@@ -29,8 +28,4 @@ func (s *SiteDao) Init() {
 	siteDao.CreateFieldDescriptor("SiteCode", redisutil.TypeEq)
 	// 开业时间进行排序
 	siteDao.CreateFieldDescriptor("CreateTime", redisutil.TypeRange)
-}
-
-func (s *SiteDao) InitTest() {
-	fmt.Println("就是测试")
 }
