@@ -1,16 +1,14 @@
 package main
 
 import (
-	_ "register-go/testx"
+	"fmt"
+	"time"
 )
 
 func main() {
-	var data []map[string]interface{}
-	TestGet(data)
+	x := float64(time.Now().Unix())
+	fmt.Println(x)
 }
-
 
 func TestGet([]interface{}) {
 }
-
-

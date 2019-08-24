@@ -19,3 +19,16 @@ logrus:
   # 24 * 60 * 60 一天
   rotationTime: 86400
 
+mysql:
+  driverName: mysql
+  ipAddr: xxx.xx.xx.xxx
+  port: 3306
+  username: root
+  password: admin
+  database: registergo
+  maxOpenConn: 100
+  maxIdeConn: 100
+  # 7 * 24 * 60 * 60
+  connMaxLifetime: 604800
+
+

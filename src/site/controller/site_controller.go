@@ -18,15 +18,22 @@ func init() {
 }
 
 type SiteController struct {
-	siteService service.ISiteService
+	siteService    service.ISiteService
+	siteSqlService *service.SiteSqlService
 }
 
 func (c *SiteController) Init() {
 	c.siteService = service.GetSiteService()
+	c.siteSqlService = service.GetSiteSqlService()
 	app := basegin.Gin().Group("/v1/site")
-	app.POST("/add", c.Add)
-	app.POST("/get/:siteId/:langCode", c.GetById)
-	app.POST("/getByField", c.GetByField)
+	app.POST("/redis/add", c.Add)
+	app.POST("/redis/get/:siteId/:langCode", c.GetById)
+	app.POST("/redis/getByField", c.GetByField)
+	app.POST("/sql/insert", c.InsertSql)
+	// 插入hashes数据类型到redis
+	app.POST("/redis/hash/add", c.AddHash)
+	app.GET("/redis/hash/get/:siteId/:langCode", c.GetHashById)
+	app.GET("/redis/hash/getall/:langCode", c.GetAllHash)
 }
 
 /**
@@ -38,7 +45,7 @@ json请求：
    "SiteId":10001,
    "SiteName":"上海",
 }
- */
+*/
 func (c *SiteController) Add(ctx *gin.Context) {
 	// 获取参数
 	var site dto.SiteDto
@@ -72,7 +79,6 @@ func (c *SiteController) GetByField(ctx *gin.Context) {
 		pageSize, ePageSize = strconv.Atoi(ctx.DefaultPostForm("pageSize", "10"))
 		fieldName           = ctx.PostForm("fieldName")
 		fieldValue          = ctx.PostForm("fieldValue")
-
 	)
 	if ePage != nil || ePageSize != nil {
 		logrus.Error(ePage, ePageSize)
@@ -89,4 +95,84 @@ func (c *SiteController) GetByField(ctx *gin.Context) {
 		pageSize = redisutil.DefaultPageSize
 	}
 	ctx.JSON(http.StatusOK, c.siteService.GetByField(fieldName, fieldValue, page, pageSize))
+}
+
+/**
+[{
+  "Id": 10004,
+  "SiteId": 10005,
+  "SiteCode":"S1005",
+  "SiteName":"人民广场店xx"
+},{
+  "Id": 10003,
+  "SiteId": 10003,
+  "SiteCode":"S1003",
+  "SiteName":"浦东店铺"
+},{
+  "id": 10002,
+  "SiteId": 10006,
+  "SiteCode":"S1006",
+  "SiteName":"人民广场店xxx"
+}]
+*/
+func (c *SiteController) InsertSql(ctx *gin.Context) {
+	var sites []dto.SiteDto
+	if err := ctx.BindJSON(&sites); err != nil {
+		logrus.Error(err)
+		ctx.JSON(http.StatusOK, common.NewRespFail())
+		return
+	}
+	ctx.JSON(http.StatusOK, c.siteSqlService.UpdateOrInsert(sites))
+}
+
+/**
+{
+   "Id":1003,
+   "SiteCode":"S1003",
+   "SiteId":10003,
+   "SiteName":"北京店"
+}
+*/
+func (c *SiteController) AddHash(ctx *gin.Context) {
+	var site dto.SiteDto
+	if err := ctx.BindJSON(&site); err != nil {
+		logrus.Error(err)
+		ctx.JSON(http.StatusOK, common.NewRespFail())
+		return
+	}
+	ctx.JSON(http.StatusOK, c.siteService.AddHash(site))
+}
+
+func (c *SiteController) GetHashById(ctx *gin.Context) {
+	var (
+		langCode    = ctx.Param("langCode")
+		siteIdParam = ctx.Param("siteId")
+		siteId      int64
+		err         error
+	)
+	if common.StrIsBlank(siteIdParam) {
+		ctx.JSON(http.StatusOK, common.NewRespFailWithMsg("参数错误"))
+		return
+	}
+	if siteId, err = strconv.ParseInt(siteIdParam, 10, 64); err != nil {
+		ctx.JSON(http.StatusOK, common.NewRespFailWithMsg("参数解析错误"))
+		return
+	}
+	ctx.JSON(http.StatusOK, c.siteService.GetHashById(siteId, langCode))
+}
+
+// 表单参数：page:1， pageSize:10
+// url参数：/:langCode
+func (c *SiteController) GetAllHash(ctx *gin.Context) {
+	var (
+		page, ePage         = strconv.Atoi(ctx.DefaultQuery("page", "1"))
+		pageSize, ePagesize = strconv.Atoi(ctx.DefaultQuery("pageSize", "10"))
+		langCode            = ctx.Param("langCode")
+	)
+	if ePage != nil || ePagesize != nil {
+		logrus.Error(ePage, ePagesize)
+		ctx.JSON(http.StatusOK, common.NewRespFailWithMsg("参数错误"))
+		return
+	}
+	ctx.JSON(http.StatusOK, c.siteService.GetAllHash(page, pageSize, langCode))
 }

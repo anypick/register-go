@@ -3,7 +3,6 @@ package redisutil
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/go-redis/redis"
 	"github.com/sirupsen/logrus"
 	"log"
@@ -25,7 +24,6 @@ const (
 )
 
 type IBaseDao interface {
-	// ========================string===================
 	// string类型数据插入
 	// @Param: data: 传入的数据，一定要有Id这个字段； expired: 过期时间，0表示永不过期； langCode: 多语言
 	// return: 是否成功
@@ -36,8 +34,8 @@ type IBaseDao interface {
 	// return: 返回数据
 	Get(id interface{}, langCode string) (map[string]interface{}, error)
 
-	// 根据属性字段查询string类型数据
-	// @Param fieldName: 字段名， fieldValue：字段值， langCode：多语言
+	// 根据属性字段查询数据
+	// @Param fieldName: 字段名， fieldValue：字段值， langCode：多语言， page, pageSize分页数据
 	// return: 返回查询的数据
 	GetByField(fieldValue interface{}, fieldName string, langCode string, page, pageSize int) ([]map[string]interface{}, error)
 
@@ -49,9 +47,11 @@ type IBaseDao interface {
 	AddHash(data map[string]interface{}, expired time.Duration, langCode string) (bool, error)
 
 	// hash数据类型获取
-	// @Param: id： 数据Id, fieldName：字段， langCode： 多语言支持
+	// @Param: id： 数据Id, langCode： 多语言支持
 	// return: 返回字段值，由用户转回成需要的数据类型（string->int, string->slice, string-> map ...）
-	GetHash(id interface{}, fieldName, langCode string) (string, error)
+	GetHash(id interface{}, langCode string) (string, error)
+
+	GetAllHash(page, pageSize int, langCode string) ([]map[string]interface{}, error)
 }
 
 // 定义一个redis的key,可能需要多个属性组成，在本代码中包含如下属性,组成格式：prefix:catalog:clazz:langCode:id, 或者：prefix:catalog:clazz:langCode:tmp:fieldName:fieldValue
@@ -233,14 +233,12 @@ func (b *BaseDao) AddHash(data map[string]interface{}, expired time.Duration, la
 		return false, err
 	}
 
-	for _, value := range data {
-		if marshalValue, err = json.Marshal(value); err != nil {
-			log.Fatalln(err)
-			return false, err
-		}
-		idOps := RedisOperation{Operation: Add, DataType: Hashes, Key: idKey, RawKey: idKey, Value: string(marshalValue)}
-		redisOps = append(redisOps, idOps)
+	if marshalValue, err = json.Marshal(data); err != nil {
+		log.Fatalln(err)
+		return false, err
 	}
+	idOps := RedisOperation{Operation: Add, DataType: Hashes, Key: idKey, RawKey: common.InterfaceToStr(idValue), Value: string(marshalValue)}
+	redisOps = append(redisOps, idOps)
 
 	if fieldOps, err = b.creatSelectedField(idValue, data, Add, langCode); err != nil {
 		log.Fatalln(err)
@@ -250,7 +248,7 @@ func (b *BaseDao) AddHash(data map[string]interface{}, expired time.Duration, la
 	return ExecutePipeline(redisOps, expired), err
 }
 
-func (b *BaseDao) GetHash(id interface{}, fieldName, langCode string) (string, error) {
+func (b *BaseDao) GetHash(id interface{}, langCode string) (string, error) {
 	var (
 		hashKey string
 		err     error
@@ -263,37 +261,42 @@ func (b *BaseDao) GetHash(id interface{}, fieldName, langCode string) (string, e
 	return client.HGet(hashKey, common.InterfaceToStr(id)).Val(), err
 }
 
-func (b *BaseDao) GetAllHash(id interface{}, page, pageSize int, langCode string) (pageInfo PageInfo, err error) {
+func (b *BaseDao) GetAllHash(page, pageSize int, langCode string) ([]map[string]interface{}, error) {
 	var (
 		hashKey  string
 		client   = baseredis.RedisClient(baseredis.SlaveNode)
 		pipeline = client.Pipeline()
-		//value = make(map[string]interface{})
-		//values = make([]map[string]interface{}, pageSize)
-		cmders []redis.Cmder
+		cmders   []redis.Cmder
+		datas    = make([]map[string]interface{}, 0)
+		err      error
 	)
 	if hashKey, err = b.createHashKey(langCode); err != nil {
-		return
+		return nil, err
 	}
 	keys := client.HKeys(hashKey).Val()
 	if keys == nil || len(keys) == 0 {
 		err = errors.New("hash table is nil")
-		return
+		return nil, err
 	}
-
-	curPageKeys := keys[(page-1)*pageSize : page*pageSize]
+	start, end := pageCount(len(keys), page, pageSize)
+	curPageKeys := keys[start:end]
 	for _, idKey := range curPageKeys {
 		pipeline.HGet(hashKey, idKey)
 	}
 	if cmders, err = pipeline.Exec(); err != nil {
-		return
+		return nil, err
 	}
-	fmt.Println(cmders)
-	return
-}
 
-func (b *BaseDao) GetHashByField() {
-
+	for _, value := range cmders {
+		var data = make(map[string]interface{})
+		val := value.(*redis.StringCmd).Val()
+		if err := json.Unmarshal([]byte(val), &data); err != nil {
+			logrus.Error("Unmarshal error, ", err)
+			return nil, err
+		}
+		datas = append(datas, data)
+	}
+	return datas, nil
 }
 
 // =========================================================================================
@@ -333,7 +336,7 @@ func (b *BaseDao) createHashFieldKey(fieldName, langCode string) (string, error)
 		langCode = DefaultLangCode
 	}
 	prefix := b.createKey(langCode)
-		return prefix + ":" + fieldName, nil
+	return prefix + ":" + fieldName, nil
 }
 
 // 创建HashKey：
@@ -460,5 +463,20 @@ func countScore(v interface{}) float64 {
 }
 
 func countPage(page, pageSize int) (int64, int64) {
-	return int64((page - 1) * pageSize), int64(page * pageSize - 1)
+	return int64((page - 1) * pageSize), int64(page*pageSize - 1)
+}
+
+// 切片的分页截取方法
+func pageCount(total, page, pageSize int) (start int, end int) {
+	pageNum := (total + pageSize - 1) / pageSize
+	if page > pageNum {
+		page = pageNum
+	}
+	start = (page - 1) * pageSize
+	if page*pageSize > total {
+		end = total
+	} else {
+		end = page * pageSize
+	}
+	return
 }
