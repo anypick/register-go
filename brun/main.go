@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	_ "register-go"
 	"register-go/infra"
+	"register-go/infra/utils/common"
 	"register-go/infra/utils/props"
 	_ "register-go/src/site/controller"
 )
@@ -18,7 +20,16 @@ _______  ____   ____ |__| ______/  |_  ___________            ____   ____
             \/_____/         \/           \/               /_____/
 `
 	fmt.Println(banner)
-	yamlConf := props.NewYamlSource("resources/application.yml")
+	profile := flag.String("profile", "", "环境信息")
+	flag.Parse()
+	resource := ""
+	if common.StrIsBlank(*profile) {
+		resource = "resources/application.yml"
+	} else {
+		resource = fmt.Sprintf("resources/application-%s.yml", *profile)
+	}
+	fmt.Println(resource)
+	yamlConf := props.NewYamlSource(resource)
 	application := infra.New(*yamlConf)
 	application.Start()
 }
