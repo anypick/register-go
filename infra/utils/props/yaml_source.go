@@ -7,6 +7,7 @@ import (
 	"log"
 	logrus "register-go/infra/base/log/config"
 	mysql "register-go/infra/base/mysql/config"
+	rabbit "register-go/infra/base/rabbitmq/config"
 	"register-go/infra/base/redis/config"
 	"register-go/infra/utils/common"
 )
@@ -17,6 +18,7 @@ type YamlSource struct {
 	config.Redis      `yaml:"redis"`
 	logrus.LogConfig  `yaml:"logrus"`
 	mysql.MySqlConfig `yaml:"mysql"`
+	rabbit.RabbitMQConfig `yaml:"rabbit"`
 }
 
 func NewYamlSource(filePathName string) *YamlSource {

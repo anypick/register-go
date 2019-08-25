@@ -31,4 +31,13 @@ mysql:
   # 7 * 24 * 60 * 60
   connMaxLifetime: 604800
 
+# rabbitmq的配置
+rabbit:
+  ipAddr: 192.168.56.130
+  port: 5672
+  # vhost命名不要带 /, 如/hmall,这样命名会有异常
+  vhost: hmall
+  username: admin
+  password: admin
+
 

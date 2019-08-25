@@ -20,6 +20,7 @@ require (
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2
+	github.com/streadway/amqp v0.0.0-20190815230801-eade30b20f1d
 	github.com/tebeka/strftime v0.1.3 // indirect
 	github.com/ugorji/go v1.1.7 // indirect
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7 // indirect

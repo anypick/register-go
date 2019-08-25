@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/sirupsen/logrus"
 	"register-go/infra"
 	"register-go/infra/base/mysql"
 	"register-go/infra/utils/common"
+	"register-go/src/rabbitmq"
 	"register-go/src/site/dao"
 	"register-go/src/site/dto"
 )
@@ -21,6 +23,7 @@ func init() {
 }
 
 var siteSqlDao = dao.GetSitSqlDao()
+var siteRabbit = rabbitmq.GetSiteRabbit()
 
 type SiteSqlService struct {
 }
@@ -53,6 +56,23 @@ func (s *SiteSqlService) UpdateOrInsert(sites []dto.SiteDto) common.ResponseData
 	})
 	if err != nil {
 		return common.NewRespFailWithMsg("更新或插入失败")
+	}
+	return common.NewRespSucc()
+}
+
+func (s *SiteSqlService) SendMsg(site dto.SiteDto) common.ResponseData {
+	var (
+		siteData []byte
+		err error
+	)
+	siteRabbit = rabbitmq.GetSiteRabbit()
+	if siteData, err = json.Marshal(site); err != nil {
+		logrus.Error(err)
+		return common.NewRespFail()
+	}
+	if err := siteRabbit.Send(siteData); err != nil {
+		logrus.Error(err)
+		return common.NewRespFail()
 	}
 	return common.NewRespSucc()
 }

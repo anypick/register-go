@@ -32,5 +32,7 @@ func (d *MySqlStarter) Init(ctx infra.StarterContext) {
 	db.SetMaxIdleConns(config.GetIntByDefault("MaxIdeConn", 1000))
 	if db.Ping() == nil {
 		logrus.Info("mysql up")
+	} else {
+		logrus.Warn(db.Ping())
 	}
 }

@@ -34,6 +34,7 @@ func (c *SiteController) Init() {
 	app.POST("/redis/hash/add", c.AddHash)
 	app.GET("/redis/hash/get/:siteId/:langCode", c.GetHashById)
 	app.GET("/redis/hash/getall/:langCode", c.GetAllHash)
+	app.POST("/rabbit/direct/sendMsg", c.SendMsg)
 }
 
 /**
@@ -175,4 +176,16 @@ func (c *SiteController) GetAllHash(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, c.siteService.GetAllHash(page, pageSize, langCode))
+}
+
+// 发送RabbitMQ消息
+func (c *SiteController) SendMsg(ctx *gin.Context) {
+	var site dto.SiteDto
+
+	if err := ctx.Bind(&site); err != nil {
+		logrus.Error(err)
+		ctx.JSON(http.StatusOK, common.NewRespFailWithMsg("参数错误"))
+		return
+	}
+	ctx.JSON(http.StatusOK, c.siteSqlService.SendMsg(site))
 }
