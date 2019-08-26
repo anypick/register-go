@@ -1,5 +1,9 @@
 package baseredis
 
+/**
+这里虽然保证了节点的写入一定落在主节点，但是一旦主节点出现故障，无法进行故障转移。
+无法保证Redis高可用，这里要和redis sentinel配合使用
+ */
 import (
 	"github.com/go-redis/redis"
 	"register-go/infra"
@@ -13,9 +17,17 @@ type NodeRole int
 const (
 	MasterNode = 0
 	SlaveNode  = 1
+	Sentinel   = 2
+	Cluster    = 3
 )
 
 var clientsMap map[NodeRole][]*redis.Client
+
+// Sentinel信息
+var (
+	masterName    string
+	sentinelAddrs []string
+)
 
 // 获取RedisClient
 // 在这里使用自定义负载均衡算法来实现负载,也可以针对架构进行优化，例如使用HAProxy进行负载
@@ -27,6 +39,9 @@ func RedisClient(nodeRole NodeRole) *redis.Client {
 	}
 	if nodeRole == SlaveNode {
 		return clients[slave.Bl.Next(common.NilString)]
+	}
+	if nodeRole == Sentinel {
+		return sentinelClient
 	}
 	return nil
 }
@@ -49,8 +64,10 @@ type RedisReplicationStarter struct {
 	infra.BaseStarter
 }
 
-func (r *RedisReplicationStarter) Init(context infra.StarterContext) {
+func (r *RedisReplicationStarter) Init(ctx infra.StarterContext) {
 	clientsMap = make(map[NodeRole][]*redis.Client, 2)
+	masterName = ctx.Yaml().RedisSentinelConfig.MasterName
+	sentinelAddrs = ctx.Yaml().RedisSentinelConfig.Addrs
 }
 
 func (r *RedisReplicationStarter) Setup(context infra.StarterContext) {
@@ -74,4 +91,5 @@ func (r *RedisReplicationStarter) Setup(context infra.StarterContext) {
 	// 设置Redis轮询算法
 	masterBalance = &RedisBalance{Bl: &balance.RoundBalance{Size: len(masterClient)}}
 	slaveBalance = &RedisBalance{Bl: &balance.RoundBalance{Size: len(slaveClient)}}
+	sentinelClient = redis.NewFailoverClient(&redis.FailoverOptions{MasterName: masterName, SentinelAddrs: sentinelAddrs})
 }

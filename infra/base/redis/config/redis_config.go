@@ -57,3 +57,9 @@ func (t RedisConfig) GetTime(key string) (time.Duration, error) {
 	value := valueOf.FieldByName(key).Interface().(int64)
 	return time.Second * time.Duration(value), nil
 }
+
+type RedisSentinelConfig struct {
+	Addrs      []string `yaml:"addrs"`
+	MasterName string   `yaml:"masterName"`
+	Password   string   `yaml:"password"`
+}

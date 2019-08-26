@@ -14,11 +14,12 @@ import (
 
 // 将yaml文件映射成结构体
 type YamlSource struct {
-	Application       `yaml:"application"`
-	config.Redis      `yaml:"redis"`
-	logrus.LogConfig  `yaml:"logrus"`
-	mysql.MySqlConfig `yaml:"mysql"`
-	rabbit.RabbitMQConfig `yaml:"rabbit"`
+	Application                `yaml:"application"`
+	config.Redis               `yaml:"redis"`
+	config.RedisSentinelConfig `yaml:"sentinel"`
+	logrus.LogConfig           `yaml:"logrus"`
+	mysql.MySqlConfig          `yaml:"mysql"`
+	rabbit.RabbitMQConfig      `yaml:"rabbit"`
 }
 
 func NewYamlSource(filePathName string) *YamlSource {

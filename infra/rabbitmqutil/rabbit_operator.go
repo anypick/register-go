@@ -1,4 +1,8 @@
 package rabbitmqutil
+/**
+定义RabbitMQ的生产者与消费者的基本操作，没有定义队列以及交换机声明相关操作的原因是：队列或者交换机声明还是希望用户在
+使用之前定义好，统一维护，不要和业务代码掺杂在一起。
+ */
 
 import (
 	"github.com/sirupsen/logrus"
@@ -7,10 +11,13 @@ import (
 )
 
 type RabbitTemplate interface {
-	// 发送消息, 交换机类型direct
+	// 发送消息
 	Send(data []byte) error
 
-	// 消息监听
+	// 消息监听,
+	// autoAck表示是否自动签收，true自动签收，无论消息是否被成功消费，消息都会被丢失
+	// false, 如果消息消费失败，消息会被重新丢回队列，进行重新消费。
+	// 一般情况下选择true, 提高系统性能
 	MessageListener(consumer func([]byte) error, autoAck bool) error
 }
 
@@ -20,18 +27,18 @@ type RabbitOperator struct {
 	RoutingKey string // 路由键
 }
 
-func (r *RabbitOperator) Send(data []byte) error {
+func (r *RabbitOperator) Send(publishing amqp.Publishing) error {
 	var (
 		conn    = baserabbitmq.GetConn()
 		channel *amqp.Channel
 		err     error
 	)
 	if channel, err = conn.Channel(); err != nil {
-		logrus.Error("channel get error", err)
+		logrus.Error("get channel error", err)
 		return err
 	}
 	defer channel.Close()
-	if err = channel.Publish(r.Exchange, r.RoutingKey, false, false, amqp.Publishing{Body: data}); err != nil {
+	if err = channel.Publish(r.Exchange, r.RoutingKey, false, false, publishing); err != nil {
 		logrus.Error("publish message error,", err)
 		return err
 	}

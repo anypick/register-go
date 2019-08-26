@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/sirupsen/logrus"
+	"github.com/streadway/amqp"
 	"register-go/infra"
 	"register-go/infra/base/mysql"
 	"register-go/infra/utils/common"
@@ -70,9 +71,11 @@ func (s *SiteSqlService) SendMsg(site dto.SiteDto) common.ResponseData {
 		logrus.Error(err)
 		return common.NewRespFail()
 	}
-	if err := siteRabbit.Send(siteData); err != nil {
+	// 过期消息
+	if err := siteRabbit.Send(amqp.Publishing{Body:siteData, Expiration: "10000"}); err != nil {
 		logrus.Error(err)
 		return common.NewRespFail()
 	}
 	return common.NewRespSucc()
 }
+

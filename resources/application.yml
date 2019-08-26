@@ -3,12 +3,18 @@ application:
   server.port: 7080
   name: register-go
 
-#  redis配置
+# redis配置
 redis:
   redisConfig:
     - {addr: 192.168.56.131:6379}
     - {addr: 192.168.56.132:6379, readOnly: true}
     - {addr: 192.168.56.132:6380, readOnly: true}
+sentinel:
+  addrs:
+    - 192.168.56.131:26379
+    - 192.168.56.132:26379
+    - 192.168.56.132:26380
+  masterName: mymaster
 # 日志配置
 logrus:
   level: trace

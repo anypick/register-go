@@ -1,11 +1,13 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"register-go/infra"
 	"register-go/infra/base/gin"
+	"register-go/infra/base/redis"
 	"register-go/infra/redisutil"
 	"register-go/infra/utils/common"
 	"register-go/src/site/dto"
@@ -33,6 +35,7 @@ func (c *SiteController) Init() {
 	// 插入hashes数据类型到redis
 	app.POST("/redis/hash/add", c.AddHash)
 	app.GET("/redis/hash/get/:siteId/:langCode", c.GetHashById)
+	app.GET("/redis/client/get", c.TestRedisClient)
 	app.GET("/redis/hash/getall/:langCode", c.GetAllHash)
 	app.POST("/rabbit/direct/sendMsg", c.SendMsg)
 }
@@ -188,4 +191,12 @@ func (c *SiteController) SendMsg(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, c.siteSqlService.SendMsg(site))
+}
+
+// 用于测试Redis客户端
+func (c *SiteController) TestRedisClient(ctx *gin.Context) {
+	client := baseredis.RedisClient(baseredis.Sentinel)
+	fmt.Println(client.Ping())
+	fmt.Println(client.HGet("hmall:Site:zh_CN:site", "10005").Val())
+	ctx.String(http.StatusOK, "hao")
 }
