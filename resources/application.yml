@@ -15,11 +15,25 @@ sentinel:
     - 192.168.56.132:26379
     - 192.168.56.132:26380
   masterName: mymaster
+redisCluster:
+  addrs:
+    - 192.168.56.131:7000
+    - 192.168.56.131:7001
+    - 192.168.56.131:7002
+    - 192.168.56.132:7003
+    - 192.168.56.132:7005
+    - 192.168.56.132:7006
+  readOnly: true
+  poolSize: 1000
+  minIdleConns: 1000
+
+
 # 日志配置
 logrus:
   level: trace
   logFileName: register-go
   filePath: logs/
+#  配置日志切割
   # 30 * 24 * 60 * 60 一个月
   maxAge: 2592000
   # 24 * 60 * 60 一天

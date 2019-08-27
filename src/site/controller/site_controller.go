@@ -36,6 +36,7 @@ func (c *SiteController) Init() {
 	app.POST("/redis/hash/add", c.AddHash)
 	app.GET("/redis/hash/get/:siteId/:langCode", c.GetHashById)
 	app.GET("/redis/client/get", c.TestRedisClient)
+	app.GET("/redis/cluster/get", c.TestRedisClusterClient)
 	app.GET("/redis/hash/getall/:langCode", c.GetAllHash)
 	app.POST("/rabbit/direct/sendMsg", c.SendMsg)
 }
@@ -198,5 +199,13 @@ func (c *SiteController) TestRedisClient(ctx *gin.Context) {
 	client := baseredis.RedisClient(baseredis.Sentinel)
 	fmt.Println(client.Ping())
 	fmt.Println(client.HGet("hmall:Site:zh_CN:site", "10005").Val())
+	ctx.String(http.StatusOK, "hao")
+}
+
+
+// 用于测试Redis客户端
+func (c *SiteController) TestRedisClusterClient(ctx *gin.Context) {
+	client := baseredis.GetRedisCluster()
+	fmt.Println(client.Ping())
 	ctx.String(http.StatusOK, "hao")
 }

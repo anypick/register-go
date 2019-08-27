@@ -8,18 +8,19 @@ import (
 	logrus "register-go/infra/base/log/config"
 	mysql "register-go/infra/base/mysql/config"
 	rabbit "register-go/infra/base/rabbitmq/config"
-	"register-go/infra/base/redis/config"
+	redis "register-go/infra/base/redis/config"
 	"register-go/infra/utils/common"
 )
 
 // 将yaml文件映射成结构体
 type YamlSource struct {
-	Application                `yaml:"application"`
-	config.Redis               `yaml:"redis"`
-	config.RedisSentinelConfig `yaml:"sentinel"`
-	logrus.LogConfig           `yaml:"logrus"`
-	mysql.MySqlConfig          `yaml:"mysql"`
-	rabbit.RabbitMQConfig      `yaml:"rabbit"`
+	Application               `yaml:"application"`
+	redis.Redis               `yaml:"redis"`
+	redis.RedisSentinelConfig `yaml:"sentinel"`
+	redis.RedisClusterConfig  `yaml:"redisCluster"`
+	logrus.LogConfig          `yaml:"logrus"`
+	mysql.MySqlConfig         `yaml:"mysql"`
+	rabbit.RabbitMQConfig     `yaml:"rabbit"`
 }
 
 func NewYamlSource(filePathName string) *YamlSource {

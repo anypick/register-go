@@ -58,8 +58,17 @@ func (t RedisConfig) GetTime(key string) (time.Duration, error) {
 	return time.Second * time.Duration(value), nil
 }
 
+// redis哨兵配置
 type RedisSentinelConfig struct {
 	Addrs      []string `yaml:"addrs"`
 	MasterName string   `yaml:"masterName"`
 	Password   string   `yaml:"password"`
+}
+
+// redis集群配置
+type RedisClusterConfig struct {
+	Addrs        []string `yaml:"addrs"`
+	ReadOnly     bool     `yaml:"readOnly"`
+	PoolSize     int      `yaml:"poolSize"`
+	MinIdleConns int      `yaml:"minIdleConns"`
 }

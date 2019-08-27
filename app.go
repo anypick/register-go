@@ -17,6 +17,7 @@ func init() {
 	infra.Register(&baselog.LogrusStarter{})
 	infra.Register(&basegin.GinStarter{})
 	infra.Register(&baseredis.RedisReplicationStarter{})
+	infra.Register(&baseredis.RedisClusterStarter{})
 	infra.Register(&basesql.MySqlStarter{})
 	infra.Register(&baserabbitmq.RabbitMQStarter{})
 
