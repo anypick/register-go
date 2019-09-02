@@ -10,6 +10,7 @@ import (
 	"register-go/infra/base/redis"
 	"register-go/infra/redisutil"
 	"register-go/infra/utils/common"
+	"register-go/src/grpc/impl"
 	"register-go/src/site/dto"
 	"register-go/src/site/service"
 	"strconv"
@@ -39,6 +40,7 @@ func (c *SiteController) Init() {
 	app.GET("/redis/cluster/get", c.TestRedisClusterClient)
 	app.GET("/redis/hash/getall/:langCode", c.GetAllHash)
 	app.POST("/rabbit/direct/sendMsg", c.SendMsg)
+	app.POST("/grpc/client/test", c.GrpcTest)
 }
 
 /**
@@ -202,10 +204,14 @@ func (c *SiteController) TestRedisClient(ctx *gin.Context) {
 	ctx.String(http.StatusOK, "hao")
 }
 
-
 // 用于测试Redis客户端
 func (c *SiteController) TestRedisClusterClient(ctx *gin.Context) {
 	client := baseredis.GetRedisCluster()
 	fmt.Println(client.Ping())
 	ctx.String(http.StatusOK, "hao")
+}
+
+// 测试Grpc客户端
+func (c *SiteController) GrpcTest(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, impl.TestGrpc(dto.SiteDto{SiteCode: "10001"}))
 }

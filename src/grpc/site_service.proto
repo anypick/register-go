@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+message SiteDto {
+    int64 siteId = 1;
+    string siteCode = 2;
+    string siteName = 3;
+}
+
+message ResponseData {
+    int64 code = 1;
+    string msg = 2;
+    int64 total = 3;
+
+}
+
+service SiteService {
+    rpc GetSiteDetailBySiteCode (SiteDto) returns (ResponseData) {}
+}

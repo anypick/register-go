@@ -1,8 +1,9 @@
 package rabbitmqutil
+
 /**
 定义RabbitMQ的生产者与消费者的基本操作，没有定义队列以及交换机声明相关操作的原因是：队列或者交换机声明还是希望用户在
 使用之前定义好，统一维护，不要和业务代码掺杂在一起。
- */
+*/
 
 import (
 	"github.com/sirupsen/logrus"
@@ -77,7 +78,6 @@ func (r *RabbitOperator) MessageListener(consumer func([]byte) error, autoAck bo
 					}
 				}
 			}
-
 		}
 	}(deliveries)
 	return nil

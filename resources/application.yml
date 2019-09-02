@@ -41,7 +41,7 @@ logrus:
 
 mysql:
   driverName: mysql
-  ipAddr: xxx.xx.xx.xxx
+  ipAddr: 47.101.155.215
   port: 3306
   username: root
   password: admin
@@ -60,4 +60,18 @@ rabbit:
   username: admin
   password: admin
 
+# elasticSearch配置
+es:
+  addrs:
+    - 192.168.56.132:9200
+    - 192.168.56.133:9200
+    - 192.168.56.135:9200
+
+
+# grpc 配置
+grpc:
+  server:
+    addr: 127.0.0.1:7001
+  clients:
+    - {addr: 127.0.0.1:7001, appName: site_service}
 

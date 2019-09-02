@@ -1,37 +1,51 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"reflect"
+	"math/rand"
+	"test/algorithm"
 	"time"
 )
 
-type SiteDto struct {
-	Id         int64
-	SiteId     int64
-	SiteCode   string
-	SiteName   string
-	CreateTime time.Time
-	UpdateTime time.Time
+// 题目说明:
+// 以下为并发业务框架, 多业务 routine 并发调用流控模块接口 algorithm.FlowControl()
+// 接口返回 true 表示放行, 业务继续处理
+// 接口返回 false 表示拒绝, 业务放弃处理
+// 流控需要实现的效果: 1秒内只允许放行 3 个业务, 不足 3 个业务则全部放行, 超过 3 个业务只放行前 3 个
+//
+// 要求:
+// 1. main.go 不能修改
+// 2. 补全 func algorithm.FlowControl() bool, 实现多业务调用的流控功能
+// 3. 要求只利用 channel 实现, 不能用 sync/atomic 包
+
+func business(id int) {
+	fmt.Printf("[business] start! id=%d\n", id)
+	for {
+		duration := time.Millisecond * (time.Duration)(500+rand.Int()%8000)
+		time.Sleep(duration)
+		if ok := algorithm.FlowControl(); ok {
+			fmt.Printf("[business] allow! id=%d\n", id)
+			// Here our business can go on
+		} else {
+			fmt.Printf("[business] deny! id=%d\n", id)
+		}
+	}
 }
 
 func main() {
-	site := SiteDto{SiteId: 10001, SiteName: "上海", CreateTime: time.Now(), UpdateTime: time.Now()}
-	toMap := structToMap(site)
+	fmt.Println("ok")
 
-	bytes, _ := json.Marshal(toMap)
-	fmt.Println(string(bytes))
-}
+	go func() {
+		for range time.NewTicker(time.Second).C {
+			fmt.Println("-----------------------")
+		}
+	}()
 
-
-func structToMap(source interface{}) map[string]interface{} {
-	typeOf := reflect.TypeOf(source)
-	valueOf := reflect.ValueOf(source)
-	count := valueOf.NumField()
-	data := make(map[string]interface{}, count)
-	for i := 0; i < count; i ++ {
-		data[typeOf.Field(i).Name] = valueOf.Field(i).Interface()
+	// many go-goroutine(business) call flowControl()
+	for i := 0; i < 20; i++ {
+		go business(i)
 	}
-	return data
+
+	ch := make(chan int)
+	<-ch
 }

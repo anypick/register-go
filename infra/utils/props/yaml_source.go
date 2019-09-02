@@ -5,6 +5,8 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
+	es "register-go/infra/base/elasticsearch/config"
+	grpc "register-go/infra/base/grpc/config"
 	logrus "register-go/infra/base/log/config"
 	mysql "register-go/infra/base/mysql/config"
 	rabbit "register-go/infra/base/rabbitmq/config"
@@ -21,6 +23,8 @@ type YamlSource struct {
 	logrus.LogConfig          `yaml:"logrus"`
 	mysql.MySqlConfig         `yaml:"mysql"`
 	rabbit.RabbitMQConfig     `yaml:"rabbit"`
+	es.EsConfig               `yaml:"es"`
+	grpc.GrpcConfig           `yaml:"grpc"`
 }
 
 func NewYamlSource(filePathName string) *YamlSource {

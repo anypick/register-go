@@ -7,6 +7,7 @@ import (
 	"register-go/infra"
 	"register-go/infra/utils/common"
 	"register-go/infra/utils/props"
+	_ "register-go/src/grpc/impl"
 	_ "register-go/src/site/controller"
 )
 

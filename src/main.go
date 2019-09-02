@@ -6,9 +6,20 @@ import (
 )
 
 func main() {
-	x := float64(time.Now().Unix())
-	fmt.Println(x)
-}
-
-func TestGet([]interface{}) {
+	count := 0
+	flag := make(chan struct{})
+	for {
+		select {
+		case <-time.After(time.Second * 1):
+			count++
+			if count == 5 {
+				close(flag)
+			}
+			fmt.Println("次数", count)
+		case <-flag:
+			goto OUT
+		}
+	}
+OUT:
+	fmt.Println("xxxx")
 }

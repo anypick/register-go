@@ -11,3 +11,5 @@
 > 5. `Logrus`整合，支持日志切割
 > 6. Yaml配置文件
 > 7. RabbitMWQ 整合
+> 8. GRPC整合
+
